@@ -125,7 +125,7 @@ function audioApp() {
         activeTab: 'dashboard',
         modalOpen: false,
         pendingSelection: null,
-        selectedTag: 'All',
+        selectedTags: [],
         editingTrackId: null,
         newTagName: '',
         newTagEmoji: '',
@@ -155,8 +155,18 @@ function audioApp() {
         },
 
         get filteredTracks() {
-            if (this.selectedTag === 'All') return this.tracks;
-            return this.tracks.filter(t => this.getTrackTags(t).includes(this.selectedTag));
+            if (this.selectedTags.length === 0) return this.tracks;
+            return this.tracks.filter(t => this.selectedTags.every(tag => this.getTrackTags(t).includes(tag)));
+        },
+
+        toggleLibraryFilterTag(tagName) {
+            if (tagName === 'All') {
+                this.selectedTags = [];
+                return;
+            }
+            const i = this.selectedTags.indexOf(tagName);
+            if (i === -1) this.selectedTags = [...this.selectedTags, tagName];
+            else this.selectedTags = this.selectedTags.filter((_, j) => j !== i);
         },
 
         getAudioContext() {

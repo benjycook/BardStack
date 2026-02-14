@@ -150,9 +150,9 @@
             <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 mask-linear">
                 <template x-for="tag in filterTags" :key="tag.name">
                     <button 
-                        @click="selectedTag = tag.name"
+                        @click="toggleLibraryFilterTag(tag.name)"
                         class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition flex items-center gap-2 active:scale-95"
-                        :class="selectedTag === tag.name 
+                        :class="(tag.name === 'All' ? selectedTags.length === 0 : selectedTags.includes(tag.name))
                             ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50' 
                             : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'">
                         <span x-text="tag.emoji"></span>
@@ -164,7 +164,7 @@
             <!-- Filtered Loops List -->
             <section>
                 <div class="flex justify-between items-center mb-3">
-                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest" x-text="selectedTag + ' Loops'"></h3>
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest" x-text="selectedTags.length ? selectedTags.join(' + ') + ' Loops' : 'All Loops'"></h3>
                     <span class="text-[10px] text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full" x-text="filteredTracks.length"></span>
                 </div>
 
