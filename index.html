@@ -62,7 +62,7 @@
             transform: scale(1.1);
         }
         .glass-nav button {
-            margin:1em;
+            margin:0.5em;
         }
     </style>
 </head>
@@ -269,6 +269,39 @@
                     <i class="fa-solid fa-trash"></i>
                     Delete All Tracks
                 </button>
+            </div>
+
+            <div class="glass-panel rounded-xl p-5 space-y-4">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Tag management</h3>
+                <ul class="space-y-2">
+                    <template x-for="(tag, index) in filterTags" :key="tag.name">
+                        <li class="flex items-center justify-between gap-2 py-2 border-b border-slate-700/50 last:border-b-0">
+                            <span class="flex items-center gap-2 min-w-0">
+                                <span class="text-base w-6 flex-shrink-0" x-text="tag.emoji"></span>
+                                <span class="text-sm text-slate-200 truncate" x-text="tag.name"></span>
+                            </span>
+                            <div class="flex items-center gap-1 flex-shrink-0">
+                                <button type="button" @click="moveTagUp(index)" :disabled="index === 0" class="w-8 h-8 rounded-lg border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:pointer-events-none transition">
+                                    <i class="fa-solid fa-chevron-up text-xs"></i>
+                                </button>
+                                <button type="button" @click="moveTagDown(index)" :disabled="index === filterTags.length - 1" class="w-8 h-8 rounded-lg border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-slate-200 disabled:opacity-40 disabled:pointer-events-none transition">
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </button>
+                                <button type="button" @click="tag.name !== 'All' && deleteFilterTag(tag.name)" :disabled="tag.name === 'All'" class="w-8 h-8 rounded-lg border border-slate-600 flex items-center justify-center text-slate-400 hover:bg-red-500/20 hover:border-red-500/30 hover:text-red-400 disabled:opacity-40 disabled:pointer-events-none transition" title="Delete tag">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+                <div class="flex gap-2 pt-2">
+                    <input type="text" x-model="newTagEmoji" placeholder="Emoji" maxlength="4" class="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white focus:border-indigo-500 outline-none text-center">
+                    <input type="text" x-model="newTagName" placeholder="Tag name" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none" @keydown.enter="addFilterTag()">
+                    <button type="button" @click="addFilterTag()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        Add
+                    </button>
+                </div>
             </div>
         </div>
     </main>

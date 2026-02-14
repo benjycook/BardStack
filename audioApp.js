@@ -3,13 +3,17 @@ const DB_VERSION = 1;
 const STORE_FILTER_TAGS = 'filterTags';
 const STORE_TRACKS = 'tracks';
 
-const DEFAULT_FILTER_TAGS = [
+const DEFAULT_FILTER_TAGS = [];
+
+/*
+[
     { name: 'All', emoji: '∞' },
     { name: 'Combat', emoji: '⚔️' },
     { name: 'Tavern', emoji: '🍺' },
     { name: 'Dungeon', emoji: '🕸️' },
     { name: 'Forest', emoji: '🌲' }
 ];
+ */
 
 const DEFAULT_TRACKS = []
 /*
@@ -123,6 +127,8 @@ function audioApp() {
         pendingSelection: null,
         selectedTag: 'All',
         editingTrackId: null,
+        newTagName: '',
+        newTagEmoji: '',
         db: null,
         loading: true,
         uploadTrackName: '',
@@ -224,10 +230,12 @@ function audioApp() {
             try {
                 this.db = await openDB();
                 let tags = await getAll(this.db, STORE_FILTER_TAGS);
+                tags.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
                 let tracks = await getAll(this.db, STORE_TRACKS);
                 if (tags.length === 0) {
-                    await saveFilterTags(this.db, DEFAULT_FILTER_TAGS);
-                    tags = DEFAULT_FILTER_TAGS;
+                    const withOrder = DEFAULT_FILTER_TAGS.map((t, i) => ({ name: t.name, emoji: t.emoji, order: i }));
+                    await saveFilterTags(this.db, withOrder);
+                    tags = withOrder;
                 }
                 if (tracks.length === 0) {
                     await putAll(this.db, STORE_TRACKS, DEFAULT_TRACKS);
@@ -247,10 +255,70 @@ function audioApp() {
         async saveFilterTags() {
             if (!this.db) return;
             try {
-                await saveFilterTags(this.db, this.filterTags);
+                const plain = this.filterTags.map((t, i) => ({ name: t.name, emoji: t.emoji, order: i }));
+                await saveFilterTags(this.db, plain);
+                this.filterTags = plain;
             } catch (e) {
                 console.error('Failed to save filter tags', e);
             }
+        },
+
+        async persistFilterTags() {
+            if (!this.db) return;
+            try {
+                const plain = this.filterTags.map((t, i) => ({ name: t.name, emoji: t.emoji, order: i }));
+                await saveFilterTags(this.db, plain);
+                this.filterTags = plain;
+            } catch (e) {
+                console.error('Failed to save filter tags', e);
+            }
+        },
+
+        async addFilterTag() {
+            const name = this.newTagName.trim();
+            if (!name) return;
+            if (this.filterTags.some(t => t.name === name)) return;
+            const emoji = (this.newTagEmoji || '•').trim() || '•';
+            this.filterTags = [...this.filterTags, { name, emoji }];
+            await this.persistFilterTags();
+            this.newTagName = '';
+            this.newTagEmoji = '';
+        },
+
+        async deleteFilterTag(name) {
+            this.filterTags = this.filterTags.filter(t => t.name !== name);
+            await this.persistFilterTags();
+            for (const track of this.tracks) {
+                const currentTags = this.getTrackTags(track);
+                if (!currentTags.includes(name)) continue;
+                const nextTags = currentTags.filter(t => t !== name);
+                const tags = nextTags.length ? nextTags : ['All'];
+                const plainTrack = {
+                    id: track.id,
+                    title: track.title,
+                    duration: track.duration || '0:00',
+                    tags: [...tags],
+                    audioData: track.audioData ?? null
+                };
+                await putTrack(this.db, plainTrack);
+                this.tracks = this.tracks.map(t => t.id === track.id ? { ...t, tags } : t);
+            }
+        },
+
+        async moveTagUp(index) {
+            if (index <= 0) return;
+            const next = [...this.filterTags];
+            [next[index - 1], next[index]] = [next[index], next[index - 1]];
+            this.filterTags = next;
+            await this.persistFilterTags();
+        },
+
+        async moveTagDown(index) {
+            if (index >= this.filterTags.length - 1) return;
+            const next = [...this.filterTags];
+            [next[index], next[index + 1]] = [next[index + 1], next[index]];
+            this.filterTags = next;
+            await this.persistFilterTags();
         },
 
         async deleteAllTracks() {
@@ -291,7 +359,7 @@ function audioApp() {
                     return;
                 }
                 if (payload.filterTags && Array.isArray(payload.filterTags)) {
-                    const plainTags = payload.filterTags.map(t => ({ name: String(t.name), emoji: String(t.emoji) }));
+                    const plainTags = payload.filterTags.map((t, i) => ({ name: String(t.name), emoji: String(t.emoji), order: i }));
                     await saveFilterTags(this.db, plainTags);
                     this.filterTags = plainTags;
                 }
