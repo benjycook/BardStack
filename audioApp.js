@@ -74,6 +74,28 @@ function addTrack(db, track) {
     });
 }
 
+function deleteTrack(db, id) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_TRACKS, 'readwrite');
+        const store = tx.objectStore(STORE_TRACKS);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+function putTrack(db, track) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_TRACKS, 'readwrite');
+        const store = tx.objectStore(STORE_TRACKS);
+        const req = store.put(track);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 function saveFilterTags(db, tags) {
     return putAll(db, STORE_FILTER_TAGS, tags);
 }
@@ -100,6 +122,7 @@ function audioApp() {
         modalOpen: false,
         pendingSelection: null,
         selectedTag: 'All',
+        editingTrackId: null,
         db: null,
         loading: true,
         uploadTrackName: '',
@@ -368,6 +391,37 @@ function audioApp() {
         confirmPlay(item) {
             this.pendingSelection = item;
             this.modalOpen = true;
+        },
+
+        async deleteTrackFromLibrary(track) {
+            if (!this.db) return;
+            try {
+                await deleteTrack(this.db, track.id);
+                this.tracks = this.tracks.filter(t => t.id !== track.id);
+            } catch (e) {
+                console.error('Failed to delete track', e);
+            }
+        },
+
+        async toggleTrackTag(track, tagName) {
+            const current = this.getTrackTags(track).filter(t => t !== 'All');
+            const hasTag = current.includes(tagName);
+            const newTags = hasTag ? current.filter(t => t !== tagName) : [...current, tagName];
+            const tags = newTags.length ? newTags : ['All'];
+            const plainTrack = {
+                id: track.id,
+                title: track.title,
+                duration: track.duration || '0:00',
+                tags: [...tags],
+                audioData: track.audioData ?? null
+            };
+            if (!this.db) return;
+            try {
+                await putTrack(this.db, plainTrack);
+                this.tracks = this.tracks.map(t => t.id === track.id ? { ...t, tags: [...tags] } : t);
+            } catch (e) {
+                console.error('Failed to update track tags', e);
+            }
         },
 
         addToStack() {

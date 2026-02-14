@@ -61,6 +61,9 @@
             background: #818cf8;
             transform: scale(1.1);
         }
+        .glass-nav button {
+            margin:1em;
+        }
     </style>
 </head>
 <body class="text-slate-200 h-screen overflow-hidden selection:bg-indigo-500 selection:text-white">
@@ -168,6 +171,7 @@
                 <div x-show="loading" class="py-8 text-center text-slate-500 text-sm">Loading library...</div>
                 <div x-show="!loading" class="bg-slate-800/30 rounded-xl divide-y divide-slate-800/50 border border-slate-700/30">
                     <template x-for="track in filteredTracks" :key="track.id">
+                        <div>
                         <div @click="confirmPlay(track)" class="p-3.5 flex items-center justify-between hover:bg-white/5 transition cursor-pointer group">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition">
@@ -184,8 +188,29 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center group-hover:border-indigo-500 group-hover:text-indigo-400 transition">
-                                <i class="fa-solid fa-plus text-xs"></i>
+                                <div class="flex items-center gap-1" @click.stop>
+                                    <button type="button" @click="editingTrackId = editingTrackId === track.id ? null : track.id" class="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 hover:border-indigo-500/50 hover:text-indigo-400 transition" :class="editingTrackId === track.id && 'border-indigo-500 text-indigo-400'">
+                                        <i class="fa-solid fa-tag text-xs"></i>
+                                    </button>
+                                    <button type="button" @click="deleteTrackFromLibrary(track)" class="w-8 h-8 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 hover:border-red-500/50 hover:text-red-400 transition">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div x-show="editingTrackId === track.id" class="px-3.5 pb-3 pt-0 border-t border-slate-800/50" @click.stop>
+                                <div class="flex flex-wrap gap-2 pt-2">
+                                    <template x-for="tag in filterTags" :key="tag.name">
+                                        <button type="button"
+                                            @click="toggleTrackTag(track, tag.name)"
+                                            class="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition"
+                                            :class="getTrackTags(track).includes(tag.name)
+                                                ? 'bg-indigo-600 border-indigo-500 text-white'
+                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'">
+                                            <span x-text="tag.emoji"></span>
+                                            <span x-text="tag.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </template>
