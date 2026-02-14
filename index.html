@@ -263,7 +263,7 @@
 
         <!-- UPLOAD TAB -->
         <div x-show="activeTab === 'upload'" style="display: none;" class="space-y-6 pt-4">
-            <input type="file" accept="audio/*" @change="setUploadAudioFile($event.target.files[0]); $event.target.value = ''" class="hidden" id="upload-audio-input">
+            <input type="file" accept="" @change="setUploadAudioFile($event.target.files[0]); $event.target.value = ''" class="hidden" id="upload-audio-input">
             <div
                 @dragover.prevent="isDraggingOver = true"
                 @dragleave.prevent="isDraggingOver = false"
