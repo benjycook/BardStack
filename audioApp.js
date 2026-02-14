@@ -419,7 +419,12 @@ function audioApp() {
                 }
 
                 if (payload.tracks && Array.isArray(payload.tracks)) {
+                    const existingTrackIds = new Set(this.tracks.map(t => t.id));
                     for (const track of payload.tracks) {
+                        if (existingTrackIds.has(track.id)) {
+                            trackIdMap[track.id] = track.id;
+                            continue;
+                        }
                         const id = Math.floor(Date.now() + Math.random() * 1000);
                         const audioData = track.audioData && typeof track.audioData === 'string' && track.audioData.startsWith('data:')
                             ? this.dataURLToBlob(track.audioData)
@@ -434,17 +439,22 @@ function audioApp() {
                         };
                         await addTrack(this.db, entry);
                         this.tracks = [...this.tracks, entry];
+                        existingTrackIds.add(track.id);
                         trackIdMap[track.id] = id;
                     }
                 }
 
                 if (payload.presets && Array.isArray(payload.presets)) {
+                    const existingPresetNames = new Set(this.presets.map(p => p.name));
                     for (const preset of payload.presets) {
+                        const name = String(preset.name || 'Unnamed');
+                        if (existingPresetNames.has(name)) continue;
+                        existingPresetNames.add(name);
                         const items = (preset.items || []).map(item => ({
                             trackId: trackIdMap[item.trackId] !== undefined ? trackIdMap[item.trackId] : item.trackId,
                             volume: Math.round(Number(item.volume))
                         }));
-                        const plainPreset = { name: String(preset.name || 'Unnamed'), items };
+                        const plainPreset = { name, items };
                         await addPreset(this.db, plainPreset);
                     }
                     this.presets = await getAll(this.db, STORE_PRESETS);
