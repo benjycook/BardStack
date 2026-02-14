@@ -224,6 +224,103 @@ function audioApp() {
             }
         },
 
+        async deleteAllTracks() {
+            if (!this.db) return;
+            try {
+                await putAll(this.db, STORE_TRACKS, []);
+                this.tracks = [];
+            } catch (e) {
+                console.error('Failed to delete tracks', e);
+            }
+        },
+
+        blobToDataURL(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(blob);
+            });
+        },
+
+        dataURLToBlob(dataURL) {
+            const [header, base64] = dataURL.split(',');
+            const mime = (header.match(/:(.*?);/) || [])[1] || 'audio/mpeg';
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Blob([bytes], { type: mime });
+        },
+
+        async importData(file) {
+            if (!file || !this.db) return;
+            try {
+                const text = await file.text();
+                const payload = JSON.parse(text);
+                if (!payload.tracks || !Array.isArray(payload.tracks)) {
+                    console.error('Invalid export file: missing tracks array');
+                    return;
+                }
+                if (payload.filterTags && Array.isArray(payload.filterTags)) {
+                    const plainTags = payload.filterTags.map(t => ({ name: String(t.name), emoji: String(t.emoji) }));
+                    await saveFilterTags(this.db, plainTags);
+                    this.filterTags = plainTags;
+                }
+                for (const track of payload.tracks) {
+                    const id = Math.floor(Date.now() + Math.random() * 1000);
+                    const audioData = track.audioData && typeof track.audioData === 'string' && track.audioData.startsWith('data:')
+                        ? this.dataURLToBlob(track.audioData)
+                        : null;
+                    const entry = {
+                        id,
+                        title: track.title || 'Untitled',
+                        duration: track.duration || '0:00',
+                        tag: track.tag || 'All',
+                        audioData
+                    };
+                    await addTrack(this.db, entry);
+                    this.tracks = [...this.tracks, entry];
+                }
+            } catch (e) {
+                console.error('Import failed', e);
+            }
+        },
+
+        triggerImportInput() {
+            this.$refs.importFileInput?.click();
+        },
+
+        async exportData() {
+            const payload = {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                filterTags: this.filterTags,
+                tracks: []
+            };
+            for (const track of this.tracks) {
+                const exported = {
+                    id: track.id,
+                    title: track.title,
+                    duration: track.duration || '0:00',
+                    tag: track.tag || 'All'
+                };
+                if (track.audioData && track.audioData instanceof Blob) {
+                    exported.audioData = await this.blobToDataURL(track.audioData);
+                } else {
+                    exported.audioData = null;
+                }
+                payload.tracks.push(exported);
+            }
+            const json = JSON.stringify(payload);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `stackloop-export-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        },
+
         setUploadAudioFile(file) {
             this.uploadAudioFile = file || null;
         },
