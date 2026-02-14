@@ -11,7 +11,9 @@ const DEFAULT_FILTER_TAGS = [
     { name: 'Forest', emoji: '🌲' }
 ];
 
-const DEFAULT_TRACKS = [
+const DEFAULT_TRACKS = []
+/*
+[
     { id: 1, title: 'Boss Battle Theme', duration: '3:45', tag: 'Combat' },
     { id: 2, title: 'Forest Birds', duration: '10:00', tag: 'Forest' },
     { id: 3, title: 'Sword Clashing Loop', duration: '1:00', tag: 'Combat' },
@@ -21,6 +23,7 @@ const DEFAULT_TRACKS = [
     { id: 7, title: 'Eerie Wind', duration: '2:30', tag: 'Dungeon' },
     { id: 8, title: 'Goblin Laughs', duration: '0:45', tag: 'Combat' }
 ];
+*/ 
 
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -75,6 +78,22 @@ function saveFilterTags(db, tags) {
     return putAll(db, STORE_FILTER_TAGS, tags);
 }
 
+function createStackItem(track, overrides = {}) {
+    return {
+        id: overrides.id ?? Date.now() + Math.random(),
+        title: track.title,
+        volume: overrides.volume ?? 80,
+        isPlaying: overrides.isPlaying ?? true,
+        icon: track.icon ?? 'fa-music',
+        audioBuffer: null,
+        gainNode: null,
+        startOffset: 0,
+        _source: null,
+        _startedAt: 0,
+        ...overrides
+    };
+}
+
 function audioApp() {
     return {
         activeTab: 'dashboard',
@@ -86,11 +105,15 @@ function audioApp() {
         uploadTrackName: '',
         uploadTrackTag: '',
         uploadAudioFile: null,
+        audioContext: null,
 
-        activeStack: [
-            { id: 101, title: 'Rainy Village', volume: 60, isPlaying: true, icon: 'fa-cloud-rain' },
-            { id: 102, title: 'Distant Thunder', volume: 30, isPlaying: true, icon: 'fa-bolt' }
+        activeStack: [],
+        /*
+        [
+            createStackItem({ title: 'Rainy Village', icon: 'fa-cloud-rain' }, { id: 101, volume: 60, isPlaying: false }),
+            createStackItem({ title: 'Distant Thunder', icon: 'fa-bolt' }, { id: 102, volume: 30, isPlaying: false })
         ],
+        */ 
 
         filterTags: [],
         tracks: [],
@@ -98,6 +121,74 @@ function audioApp() {
         get filteredTracks() {
             if (this.selectedTag === 'All') return this.tracks;
             return this.tracks.filter(t => t.tag === this.selectedTag);
+        },
+
+        getAudioContext() {
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return this.audioContext;
+        },
+
+        async ensureAudioContext() {
+            const ctx = this.getAudioContext();
+            if (ctx.state === 'suspended') await ctx.resume();
+            return ctx;
+        },
+
+        async decodeAudioData(blob) {
+            const ctx = this.getAudioContext();
+            const arrayBuffer = await blob.arrayBuffer();
+            return await ctx.decodeAudioData(arrayBuffer);
+        },
+
+        startPlayback(item) {
+            if (!item.audioBuffer) return;
+            const ctx = this.audioContext || this.getAudioContext();
+            if (item._source) {
+                try { item._source.stop(); } catch (_) {}
+                item._source.disconnect();
+            }
+            if (!item.gainNode) {
+                item.gainNode = ctx.createGain();
+                item.gainNode.connect(ctx.destination);
+            }
+            item.gainNode.gain.setValueAtTime(item.volume / 100, ctx.currentTime);
+            const source = ctx.createBufferSource();
+            source.buffer = item.audioBuffer;
+            source.loop = true;
+            source.connect(item.gainNode);
+            source.start(0, item.startOffset);
+            item._source = source;
+            item._startedAt = ctx.currentTime;
+        },
+
+        pausePlayback(item) {
+            if (item._source) {
+                const ctx = this.audioContext;
+                if (ctx) {
+                    item.startOffset = item.startOffset + (ctx.currentTime - item._startedAt);
+                    if (item.startOffset < 0) item.startOffset = 0;
+                }
+                try { item._source.stop(); } catch (_) {}
+                item._source.disconnect();
+                item._source = null;
+            }
+        },
+
+        togglePlay(track) {
+            track.isPlaying = !track.isPlaying;
+            if (track.isPlaying) {
+                this.startPlayback(track);
+            } else {
+                this.pausePlayback(track);
+            }
+        },
+
+        setTrackVolume(track) {
+            if (track.gainNode && this.audioContext) {
+                track.gainNode.gain.setValueAtTime(track.volume / 100, this.audioContext.currentTime);
+            }
         },
 
         async init() {
@@ -182,28 +273,44 @@ function audioApp() {
 
         processSelection(replace) {
             if (replace) {
+                this.activeStack.forEach(item => {
+                    this.pausePlayback(item);
+                    if (item.gainNode) item.gainNode.disconnect();
+                });
                 this.activeStack = [];
             }
             this.pushToStack(this.pendingSelection);
         },
 
-        pushToStack(track) {
-            const newId = Date.now() + Math.random();
-            this.activeStack.push({
-                id: newId,
-                title: track.title,
-                volume: 80,
-                isPlaying: true,
-                icon: 'fa-music'
-            });
+        async pushToStack(track) {
+            await this.ensureAudioContext();
+            const item = createStackItem(track);
+            this.activeStack.push(item);
+            if (track.audioData) {
+                try {
+                    item.audioBuffer = await this.decodeAudioData(track.audioData);
+                    if (item.isPlaying) this.startPlayback(item);
+                } catch (e) {
+                    console.error('Failed to decode audio', e);
+                    item.isPlaying = false;
+                }
+            } else {
+                item.isPlaying = false;
+            }
         },
 
         removeFromStack(index) {
+            const item = this.activeStack[index];
+            this.pausePlayback(item);
+            if (item.gainNode) item.gainNode.disconnect();
             this.activeStack.splice(index, 1);
         },
 
         stopAll() {
-            this.activeStack.forEach(t => t.isPlaying = false);
+            this.activeStack.forEach(item => {
+                this.pausePlayback(item);
+                item.isPlaying = false;
+            });
         }
     };
 }
