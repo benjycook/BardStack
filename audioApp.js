@@ -134,6 +134,7 @@ function audioApp() {
         uploadTrackName: '',
         uploadTrackTags: [],
         uploadAudioFile: null,
+        isDraggingOver: false,
         audioContext: null,
 
         activeStack: [],
@@ -421,6 +422,12 @@ function audioApp() {
 
         setUploadAudioFile(file) {
             this.uploadAudioFile = file || null;
+        },
+
+        handleUploadDrop(e) {
+            this.isDraggingOver = false;
+            const file = e.dataTransfer?.files?.[0];
+            if (file) this.setUploadAudioFile(file);
         },
 
         clearUploadForm() {
