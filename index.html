@@ -31,8 +31,7 @@
             background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(10px);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
-            position:fixed;
-            bottom:0;
+            
         }
 
         input[type=range] {
@@ -90,7 +89,7 @@
     </header>
 
     <!-- MAIN SCROLL AREA -->
-    <main class="flex-1 overflow-y-auto no-scrollbar pb-24 scroll-smooth px-5">
+    <main class="flex-1  overflow-y-auto no-scrollbar pb-80 scroll-smooth px-5">
         
         <!-- DASHBOARD (THE STACK) -->
         <div x-show="activeTab === 'dashboard'" x-transition.opacity.duration.300ms class="space-y-4">
@@ -465,7 +464,7 @@
     </div>
 
     <!-- BOTTOM NAVIGATION -->
-    <nav class="glass-nav h-[4.5rem] flex justify-around items-center px-2 pb-1 z-40">
+    <nav class="glass-nav h-[12em] md:h-[6em] flex justify-around px-2 pb-1 z-40">
         <button @click="activeTab = 'dashboard'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
             <i class="fa-solid fa-layer-group text-xl mb-0.5"></i>
             <span class="text-[10px] font-bold tracking-wide">Stack</span>
