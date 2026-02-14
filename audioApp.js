@@ -1,7 +1,8 @@
 const DB_NAME = 'stackloop';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_FILTER_TAGS = 'filterTags';
 const STORE_TRACKS = 'tracks';
+const STORE_PRESETS = 'presets';
 
 const DEFAULT_FILTER_TAGS = [];
 
@@ -42,7 +43,32 @@ function openDB() {
             if (!db.objectStoreNames.contains(STORE_TRACKS)) {
                 db.createObjectStore(STORE_TRACKS, { keyPath: 'id' });
             }
+            if (!db.objectStoreNames.contains(STORE_PRESETS)) {
+                db.createObjectStore(STORE_PRESETS, { keyPath: 'id', autoIncrement: true });
+            }
         };
+    });
+}
+
+function addPreset(db, preset) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_PRESETS, 'readwrite');
+        const store = tx.objectStore(STORE_PRESETS);
+        const req = store.add(preset);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+function deletePresetById(db, id) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_PRESETS, 'readwrite');
+        const store = tx.objectStore(STORE_PRESETS);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
     });
 }
 
@@ -125,6 +151,11 @@ function audioApp() {
         activeTab: 'dashboard',
         modalOpen: false,
         pendingSelection: null,
+        presetNameModalOpen: false,
+        presetNameInput: '',
+        loadPresetModalOpen: false,
+        selectedPreset: null,
+        presets: [],
         selectedTags: [],
         editingTrackId: null,
         newTagName: '',
@@ -254,6 +285,11 @@ function audioApp() {
                 }
                 this.filterTags = tags;
                 this.tracks = tracks;
+                try {
+                    this.presets = await getAll(this.db, STORE_PRESETS);
+                } catch (_) {
+                    this.presets = [];
+                }
             } catch (e) {
                 console.error('IndexedDB init failed', e);
                 this.filterTags = DEFAULT_FILTER_TAGS;
@@ -365,30 +401,53 @@ function audioApp() {
             try {
                 const text = await file.text();
                 const payload = JSON.parse(text);
-                if (!payload.tracks || !Array.isArray(payload.tracks)) {
-                    console.error('Invalid export file: missing tracks array');
-                    return;
-                }
+                const trackIdMap = {};
+
                 if (payload.filterTags && Array.isArray(payload.filterTags)) {
-                    const plainTags = payload.filterTags.map((t, i) => ({ name: String(t.name), emoji: String(t.emoji), order: i }));
+                    const existingNames = new Set(this.filterTags.map(t => t.name));
+                    const merged = this.filterTags.map((t, i) => ({ name: t.name, emoji: t.emoji, order: i }));
+                    for (const t of payload.filterTags) {
+                        const name = String(t.name);
+                        if (!existingNames.has(name)) {
+                            existingNames.add(name);
+                            merged.push({ name, emoji: String(t.emoji || '•'), order: merged.length });
+                        }
+                    }
+                    const plainTags = merged.map((t, i) => ({ ...t, order: i }));
                     await saveFilterTags(this.db, plainTags);
                     this.filterTags = plainTags;
                 }
-                for (const track of payload.tracks) {
-                    const id = Math.floor(Date.now() + Math.random() * 1000);
-                    const audioData = track.audioData && typeof track.audioData === 'string' && track.audioData.startsWith('data:')
-                        ? this.dataURLToBlob(track.audioData)
-                        : null;
-                    const tags = Array.isArray(track.tags) ? track.tags : (track.tag != null ? [track.tag] : ['All']);
-                    const entry = {
-                        id,
-                        title: track.title || 'Untitled',
-                        duration: track.duration || '0:00',
-                        tags: tags.map(String),
-                        audioData
-                    };
-                    await addTrack(this.db, entry);
-                    this.tracks = [...this.tracks, entry];
+
+                if (payload.tracks && Array.isArray(payload.tracks)) {
+                    for (const track of payload.tracks) {
+                        const id = Math.floor(Date.now() + Math.random() * 1000);
+                        const audioData = track.audioData && typeof track.audioData === 'string' && track.audioData.startsWith('data:')
+                            ? this.dataURLToBlob(track.audioData)
+                            : null;
+                        const tags = Array.isArray(track.tags) ? track.tags : (track.tag != null ? [track.tag] : ['All']);
+                        const entry = {
+                            id,
+                            title: track.title || 'Untitled',
+                            duration: track.duration || '0:00',
+                            tags: tags.map(String),
+                            audioData
+                        };
+                        await addTrack(this.db, entry);
+                        this.tracks = [...this.tracks, entry];
+                        trackIdMap[track.id] = id;
+                    }
+                }
+
+                if (payload.presets && Array.isArray(payload.presets)) {
+                    for (const preset of payload.presets) {
+                        const items = (preset.items || []).map(item => ({
+                            trackId: trackIdMap[item.trackId] !== undefined ? trackIdMap[item.trackId] : item.trackId,
+                            volume: Math.round(Number(item.volume))
+                        }));
+                        const plainPreset = { name: String(preset.name || 'Unnamed'), items };
+                        await addPreset(this.db, plainPreset);
+                    }
+                    this.presets = await getAll(this.db, STORE_PRESETS);
                 }
             } catch (e) {
                 console.error('Import failed', e);
@@ -404,7 +463,8 @@ function audioApp() {
                 version: 1,
                 exportedAt: new Date().toISOString(),
                 filterTags: this.filterTags,
-                tracks: []
+                tracks: [],
+                presets: []
             };
             for (const track of this.tracks) {
                 const exported = {
@@ -419,6 +479,12 @@ function audioApp() {
                     exported.audioData = null;
                 }
                 payload.tracks.push(exported);
+            }
+            for (const preset of this.presets) {
+                payload.presets.push({
+                    name: preset.name,
+                    items: (preset.items || []).map(i => ({ trackId: i.trackId, volume: Math.round(Number(i.volume)) }))
+                });
             }
             const json = JSON.stringify(payload);
             const blob = new Blob([json], { type: 'application/json' });
@@ -532,9 +598,10 @@ function audioApp() {
             this.pushToStack(this.pendingSelection);
         },
 
-        async pushToStack(track) {
+        async pushToStack(track, options = {}) {
             await this.ensureAudioContext();
-            const item = createStackItem(track);
+            const volume = options.volume != null ? Math.min(100, Math.max(0, Math.round(Number(options.volume)))) : 80;
+            const item = createStackItem(track, { sourceTrackId: track.id, volume });
             this.activeStack.push(item);
             if (track.audioData) {
                 try {
@@ -554,6 +621,58 @@ function audioApp() {
             this.pausePlayback(item);
             if (item.gainNode) item.gainNode.disconnect();
             this.activeStack.splice(index, 1);
+        },
+
+        clearStack() {
+            this.activeStack.forEach(item => {
+                this.pausePlayback(item);
+                if (item.gainNode) item.gainNode.disconnect();
+            });
+            this.activeStack = [];
+        },
+
+        async savePreset() {
+            const name = this.presetNameInput.trim();
+            if (!name || !this.db) return;
+            const items = this.activeStack
+                .filter(i => i.sourceTrackId != null)
+                .map(i => ({ trackId: i.sourceTrackId, volume: Math.round(Number(i.volume)) }));
+            try {
+                await addPreset(this.db, { name, items });
+                this.presets = await getAll(this.db, STORE_PRESETS);
+                this.presetNameModalOpen = false;
+                this.presetNameInput = '';
+            } catch (e) {
+                console.error('Failed to save preset', e);
+            }
+        },
+
+        async applyPreset(replace) {
+            const preset = this.selectedPreset;
+            if (!preset || !preset.items) return;
+            if (replace) this.clearStack();
+            for (const item of preset.items) {
+                const track = this.tracks.find(t => t.id === item.trackId);
+                if (track) await this.pushToStack(track, { volume: Math.min(100, Math.max(0, Math.round(Number(item.volume)))) });
+            }
+            this.loadPresetModalOpen = false;
+            this.selectedPreset = null;
+            this.activeTab = 'dashboard';
+        },
+
+        openLoadPresetModal(preset) {
+            this.selectedPreset = preset;
+            this.loadPresetModalOpen = true;
+        },
+
+        async deletePreset(id) {
+            if (!this.db) return;
+            try {
+                await deletePresetById(this.db, id);
+                this.presets = this.presets.filter(p => p.id !== id);
+            } catch (e) {
+                console.error('Failed to delete preset', e);
+            }
         },
 
         stopAll() {

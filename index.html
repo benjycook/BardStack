@@ -62,7 +62,7 @@
             transform: scale(1.1);
         }
         .glass-nav button {
-            margin:0.5em;
+            margin:1em;
         }
     </style>
 </head>
@@ -134,13 +134,50 @@
                     <div class="absolute inset-0 bg-indigo-500/5 rounded-xl -z-10 transition-opacity duration-500" :class="track.isPlaying ? 'opacity-100' : 'opacity-0'"></div>
                 </div>
             </template>
+
+            <div class="flex gap-3 pt-4">
+                <button type="button" @click="presetNameModalOpen = true; presetNameInput = ''" class="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-bold rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-bookmark"></i>
+                    Save as preset
+                </button>
+                <button type="button" @click="clearStack()" class="flex-1 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-trash"></i>
+                    Clear all
+                </button>
+            </div>
+        </div>
+
+        <!-- PRESETS TAB -->
+        <div x-show="activeTab === 'presets'" style="display: none;" class="space-y-4 pt-4">
+            <div x-show="presets.length === 0" class="flex flex-col items-center justify-center h-64 text-slate-500 gap-3 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-800/20">
+                <i class="fa-solid fa-bookmark text-3xl opacity-50"></i>
+                <p class="text-sm">No presets yet</p>
+                <p class="text-xs">Save a preset from the Stack screen</p>
+            </div>
+            <div x-show="presets.length > 0" class="bg-slate-800/30 rounded-xl divide-y divide-slate-800/50 border border-slate-700/30">
+                <template x-for="preset in presets" :key="preset.id">
+                    <div @click="openLoadPresetModal(preset)" class="p-4 flex items-center gap-3 hover:bg-white/5 transition cursor-pointer group">
+                        <div class="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-300 flex-shrink-0">
+                            <i class="fa-solid fa-bookmark"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-200 truncate" x-text="preset.name"></p>
+                            <p class="text-xs text-slate-500" x-text="(preset.items && preset.items.length) ? preset.items.length + ' track' + (preset.items.length !== 1 ? 's' : '') : 'Empty'"></p>
+                        </div>
+                        <button type="button" @click.stop="deletePreset(preset.id)" class="w-9 h-9 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 hover:border-red-500/50 hover:text-red-400 transition flex-shrink-0">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                        <i class="fa-solid fa-chevron-right text-slate-500 text-sm group-hover:text-indigo-400 transition flex-shrink-0"></i>
+                    </div>
+                </template>
+            </div>
         </div>
 
         <!-- LIBRARY TAB -->
         <div x-show="activeTab === 'library'" style="display: none;" class="space-y-4">
             
             <!-- Search -->
-            <div class="relative group mb-2">
+            <div class="relative group mb-2 hidden">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-500 transition"></i>
                 <input type="text" placeholder="Find loops..." 
                     class="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition placeholder-slate-500">
@@ -303,7 +340,7 @@
                 </ul>
                 <div class="flex gap-2 pt-2">
                     <input type="text" x-model="newTagEmoji" placeholder="Emoji" maxlength="4" class="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white focus:border-indigo-500 outline-none text-center">
-                    <input type="text" x-model="newTagName" placeholder="Tag name" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none" @keydown.enter="addFilterTag()">
+                    <input type="text" x-model="newTagName" placeholder="Tag name" class="flex-1 w-20 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none" @keydown.enter="addFilterTag()">
                     <button type="button" @click="addFilterTag()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition flex items-center gap-2">
                         <i class="fa-solid fa-plus"></i>
                         Add
@@ -350,24 +387,98 @@
         </div>
     </div>
 
+    <!-- LOAD PRESET MODAL -->
+    <div x-show="loadPresetModalOpen" class="absolute inset-0 z-50 flex sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none; align-items: center">
+        
+        <div class="bg-slate-900 w-full max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6 shadow-2xl transform transition-transform"
+             @click.away="loadPresetModalOpen = false">
+            
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-bookmark text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-1">Load preset</h3>
+                <p class="text-sm text-slate-400" x-text="selectedPreset ? selectedPreset.name : ''"></p>
+            </div>
+
+            <div class="space-y-3">
+                <button @click="applyPreset(true)" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-900/40 transition active:scale-95">
+                    Replace all tracks
+                </button>
+                <button @click="applyPreset(false)" class="w-full py-3.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold rounded-xl transition active:scale-95">
+                    Add to stack
+                </button>
+                <button @click="loadPresetModalOpen = false; selectedPreset = null" class="w-full py-2 text-slate-500 text-sm font-medium hover:text-slate-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SAVE PRESET NAME MODAL -->
+    <div x-show="presetNameModalOpen" class="absolute inset-0 z-50 flex sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none; align-items: center">
+        
+        <div class="bg-slate-900 w-full max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6 shadow-2xl transform transition-transform"
+             @click.away="presetNameModalOpen = false">
+            
+            <div class="text-center mb-4">
+                <div class="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-bookmark text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-1">Save as preset</h3>
+                <p class="text-sm text-slate-400">Enter a name for this preset</p>
+            </div>
+
+            <input type="text" x-model="presetNameInput" placeholder="Preset name" class="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 px-4 text-sm text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none mb-4 placeholder-slate-500" @keydown.enter="savePreset()">
+
+            <div class="space-y-3">
+                <button @click="savePreset()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-900/40 transition active:scale-95">
+                    Save
+                </button>
+                <button @click="presetNameModalOpen = false" class="w-full py-2 text-slate-500 text-sm font-medium hover:text-slate-300">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- BOTTOM NAVIGATION -->
     <nav class="glass-nav h-[4.5rem] flex justify-around items-center px-2 pb-1 z-40">
-        <button @click="activeTab = 'dashboard'" class="flex flex-col items-center gap-1 w-20 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+        <button @click="activeTab = 'dashboard'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
             <i class="fa-solid fa-layer-group text-xl mb-0.5"></i>
             <span class="text-[10px] font-bold tracking-wide">Stack</span>
         </button>
 
-        <button @click="activeTab = 'library'" class="flex flex-col items-center gap-1 w-20 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+        <button @click="activeTab = 'presets'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'presets' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+            <i class="fa-solid fa-bookmark text-xl mb-0.5"></i>
+            <span class="text-[10px] font-bold tracking-wide">Presets</span>
+        </button>
+
+        <button @click="activeTab = 'library'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
              <i class="fa-solid fa-list-ul text-xl mb-0.5"></i>
             <span class="text-[10px] font-bold tracking-wide">Library</span>
         </button>
 
-        <button @click="activeTab = 'upload'" class="flex flex-col items-center gap-1 w-20 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'upload' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+        <button @click="activeTab = 'upload'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'upload' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
              <i class="fa-solid fa-cloud-arrow-up text-xl mb-0.5"></i>
             <span class="text-[10px] font-bold tracking-wide">Upload</span>
         </button>
 
-        <button @click="activeTab = 'settings'" class="flex flex-col items-center gap-1 w-20 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'settings' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
+        <button @click="activeTab = 'settings'" class="flex flex-col items-center gap-1 w-10 p-2 rounded-xl transition-all duration-300" :class="activeTab === 'settings' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'">
             <i class="fa-solid fa-gear text-xl mb-0.5"></i>
             <span class="text-[10px] font-bold tracking-wide">Settings</span>
         </button>
