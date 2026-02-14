@@ -175,8 +175,10 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-medium text-slate-300 group-hover:text-white transition" x-text="track.title"></p>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-[10px] text-slate-500" x-text="track.tag"></span>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <template x-for="tag in getTrackTags(track)" :key="tag">
+                                            <span class="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded" x-text="tag"></span>
+                                        </template>
                                         <span class="text-[10px] text-slate-600">•</span>
                                         <span class="text-[10px] text-slate-600" x-text="track.duration"></span>
                                     </div>
@@ -207,9 +209,22 @@
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Details</label>
                 <input type="text" x-model="uploadTrackName" placeholder="Loop Name" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-indigo-500 outline-none mb-3">
-                <input type="text" x-model="uploadTrackTag" placeholder="Tag (e.g. Combat)" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-indigo-500 outline-none">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-3">Tag</label>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="tag in filterTags" :key="tag.name">
+                        <button type="button"
+                            @click="toggleUploadTag(tag.name)"
+                            class="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition flex items-center gap-2 active:scale-95"
+                            :class="uploadTrackTags.includes(tag.name)
+                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50'
+                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'">
+                            <span x-text="tag.emoji"></span>
+                            <span x-text="tag.name"></span>
+                        </button>
+                    </template>
+                </div>
             </div>
-            <button @click="uploadTrackName && saveTrackToLibrary({ title: uploadTrackName, tag: uploadTrackTag || 'All', audioData: uploadAudioFile })" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition">Save to Library</button>
+            <button @click="uploadTrackName && saveTrackToLibrary({ title: uploadTrackName, tags: uploadTrackTags.length ? uploadTrackTags : ['All'], audioData: uploadAudioFile })" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition">Save to Library</button>
         </div>
 
         <!-- SETTINGS TAB -->

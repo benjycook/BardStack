@@ -103,7 +103,7 @@ function audioApp() {
         db: null,
         loading: true,
         uploadTrackName: '',
-        uploadTrackTag: '',
+        uploadTrackTags: [],
         uploadAudioFile: null,
         audioContext: null,
 
@@ -118,9 +118,15 @@ function audioApp() {
         filterTags: [],
         tracks: [],
 
+        getTrackTags(track) {
+            if (Array.isArray(track.tags) && track.tags.length) return track.tags;
+            if (track.tag != null && track.tag !== '') return [track.tag];
+            return ['All'];
+        },
+
         get filteredTracks() {
             if (this.selectedTag === 'All') return this.tracks;
-            return this.tracks.filter(t => t.tag === this.selectedTag);
+            return this.tracks.filter(t => this.getTrackTags(t).includes(this.selectedTag));
         },
 
         getAudioContext() {
@@ -271,11 +277,12 @@ function audioApp() {
                     const audioData = track.audioData && typeof track.audioData === 'string' && track.audioData.startsWith('data:')
                         ? this.dataURLToBlob(track.audioData)
                         : null;
+                    const tags = Array.isArray(track.tags) ? track.tags : (track.tag != null ? [track.tag] : ['All']);
                     const entry = {
                         id,
                         title: track.title || 'Untitled',
                         duration: track.duration || '0:00',
-                        tag: track.tag || 'All',
+                        tags: tags.map(String),
                         audioData
                     };
                     await addTrack(this.db, entry);
@@ -302,7 +309,7 @@ function audioApp() {
                     id: track.id,
                     title: track.title,
                     duration: track.duration || '0:00',
-                    tag: track.tag || 'All'
+                    tags: this.getTrackTags(track)
                 };
                 if (track.audioData && track.audioData instanceof Blob) {
                     exported.audioData = await this.blobToDataURL(track.audioData);
@@ -327,17 +334,24 @@ function audioApp() {
 
         clearUploadForm() {
             this.uploadTrackName = '';
-            this.uploadTrackTag = '';
+            this.uploadTrackTags = [];
             this.uploadAudioFile = null;
+        },
+
+        toggleUploadTag(tagName) {
+            const i = this.uploadTrackTags.indexOf(tagName);
+            if (i === -1) this.uploadTrackTags = [...this.uploadTrackTags, tagName];
+            else this.uploadTrackTags = this.uploadTrackTags.filter((_, j) => j !== i);
         },
 
         async saveTrackToLibrary(track) {
             const id = Number.isInteger(track.id) ? track.id : Math.floor(Date.now() + Math.random() * 1000);
+            const tags = Array.isArray(track.tags) ? [...track.tags] : (track.tag != null ? [track.tag] : ['All']);
             const entry = {
                 id,
                 title: track.title,
                 duration: track.duration || '0:00',
-                tag: track.tag || 'All',
+                tags,
                 audioData: track.audioData ?? null
             };
             if (!this.db) return;
