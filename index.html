@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DM Audio Controller</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="audioApp.js"></script>
     <style>
@@ -30,6 +30,8 @@
             background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(10px);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
+            position:fixed;
+            bottom:0;
         }
 
         input[type=range] {
@@ -196,7 +198,7 @@
 
         <!-- UPLOAD TAB -->
         <div x-show="activeTab === 'upload'" style="display: none;" class="space-y-6 pt-4">
-            <input type="file" accept="audio/*" @change="setUploadAudioFile($event.target.files[0]); $event.target.value = ''" class="hidden" id="upload-audio-input">
+            <input type="file" @change="setUploadAudioFile($event.target.files[0]); $event.target.value = ''" class="hidden" id="upload-audio-input">
             <label for="upload-audio-input" class="block border-2 border-dashed border-slate-700 bg-slate-800/20 rounded-2xl h-40 flex flex-col items-center justify-center text-center gap-3 hover:border-indigo-500/50 hover:bg-slate-800/40 transition cursor-pointer">
                 <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-2xl"></i>
                 <p class="text-sm text-slate-300" x-text="uploadAudioFile ? uploadAudioFile.name : 'Upload Loop File'"></p>
@@ -212,14 +214,14 @@
     </main>
 
     <!-- "ADD TO STACK" MODAL -->
-    <div x-show="modalOpen" class="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+    <div x-show="modalOpen" class="absolute inset-0 z-50 flex sm:items-center justify-center bg-black/80 backdrop-blur-sm"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         style="display: none;">
+         style="display: none; align-items: center">
         
         <div class="bg-slate-900 w-full max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-700 p-6 shadow-2xl transform transition-transform"
              @click.away="modalOpen = false">
