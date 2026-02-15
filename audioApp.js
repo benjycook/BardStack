@@ -469,13 +469,10 @@ function audioApp() {
         },
 
         async exportData() {
-            const payload = {
-                version: 1,
-                exportedAt: new Date().toISOString(),
-                filterTags: this.filterTags,
-                tracks: [],
-                presets: []
-            };
+            const chunks = [];
+            const date = new Date().toISOString();
+            chunks.push('{"version":1,"exportedAt":"', date, '","filterTags":', JSON.stringify(this.filterTags), ',"tracks":[');
+            let trackFirst = true;
             for (const track of this.tracks) {
                 const exported = {
                     id: track.id,
@@ -488,20 +485,24 @@ function audioApp() {
                 } else {
                     exported.audioData = null;
                 }
-                payload.tracks.push(exported);
+                if (!trackFirst) chunks.push(',');
+                chunks.push(JSON.stringify(exported));
+                trackFirst = false;
             }
+            chunks.push('],"presets":[');
+            let presetFirst = true;
             for (const preset of this.presets) {
-                payload.presets.push({
-                    name: preset.name,
-                    items: (preset.items || []).map(i => ({ trackId: i.trackId, volume: Math.round(Number(i.volume)) }))
-                });
+                const obj = { name: preset.name, items: (preset.items || []).map(i => ({ trackId: i.trackId, volume: Math.round(Number(i.volume)) })) };
+                if (!presetFirst) chunks.push(',');
+                chunks.push(JSON.stringify(obj));
+                presetFirst = false;
             }
-            const json = JSON.stringify(payload);
-            const blob = new Blob([json], { type: 'application/json' });
+            chunks.push(']}');
+            const blob = new Blob(chunks, { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `stackloop-export-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `stackloop-export-${date.slice(0, 10)}.json`;
             a.click();
             URL.revokeObjectURL(url);
         },
